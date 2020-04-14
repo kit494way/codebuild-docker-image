@@ -1,13 +1,22 @@
 import { expect as expectCDK, matchTemplate, MatchStyle } from '@aws-cdk/assert';
 import * as cdk from '@aws-cdk/core';
-import CodebuildDockerImage = require('../lib/codebuild-docker-image-stack');
+import { CodebuildDockerImageStack } from '../lib/codebuild-docker-image-stack';
 
 test('Empty Stack', () => {
-    const app = new cdk.App();
-    // WHEN
-    const stack = new CodebuildDockerImage.CodebuildDockerImageStack(app, 'MyTestStack');
-    // THEN
-    expectCDK(stack).to(matchTemplate({
-      "Resources": {}
-    }, MatchStyle.EXACT))
+  const app = new cdk.App();
+  // WHEN
+  const props = {
+    s3StackName: 's3Stack',
+    ecrName: 'image',
+  };
+  const stack = new CodebuildDockerImageStack(app, 'MyTestStack', props);
+  // THEN
+  expectCDK(stack).to(
+    matchTemplate(
+      {
+        Resources: {},
+      },
+      MatchStyle.EXACT
+    )
+  );
 });
