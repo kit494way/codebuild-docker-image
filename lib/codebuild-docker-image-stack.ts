@@ -1,5 +1,7 @@
 import * as cdk from '@aws-cdk/core';
 import * as codebuild from '@aws-cdk/aws-codebuild';
+import * as codepipeline from '@aws-cdk/aws-codepipeline';
+import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
 import * as ecr from '@aws-cdk/aws-ecr';
 import * as s3 from '@aws-cdk/aws-s3';
 
@@ -46,10 +48,12 @@ export class CodebuildDockerImageStack extends cdk.Stack {
         phases: {
           pre_build: {
             commands: [
+              'echo "CODEBUILD_SOURCE_VERSION=${CODEBUILD_SOURCE_VERSION}"',
+              'echo "CODEBUILD_RESOLVED_SOURCE_VERSION=${CODEBUILD_RESOLVED_SOURCE_VERSION}"',
+              'if [ -n "${CODEBUILD_RESOLVED_SOURCE_VERSION}" ]; then export IMAGE_TAG="v-${CODEBUILD_RESOLVED_SOURCE_VERSION}"; elif [ -n "${CODEBUILD_SOURCE_VERSION}" ]; then export IMAGE_TAG="v-${CODEBUILD_SOURCE_VERSION}"; else export IMAGE_TAG=""; fi',
               'echo Logging in to Amazon ECR...',
-              'if [ -n "${CODEBUILD_SOURCE_VERSION}" ]; then export IMAGE_TAG="v-${CODEBUILD_SOURCE_VERSION}"; else export IMAGE_TAG=""; fi',
               'aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin https://${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com',
-            ]
+            ],
           },
           build: {
             commands: [
@@ -69,10 +73,37 @@ export class CodebuildDockerImageStack extends cdk.Stack {
             ],
           },
         },
-      })
+      }),
     });
 
     repository.grantPullPush(project);
+
+    const sourceOutput = new codepipeline.Artifact();
+    const sourceAction = new codepipeline_actions.S3SourceAction({
+      actionName: 'S3Source',
+      bucket,
+      bucketKey: sourceS3Path,
+      output: sourceOutput,
+    });
+
+    const buildAction = new codepipeline_actions.CodeBuildAction({
+      actionName: 'CodeBuild',
+      project,
+      input: sourceOutput,
+    });
+
+    new codepipeline.Pipeline(this, 'Pipeline', {
+      stages: [
+        {
+          stageName: 'Source',
+          actions: [sourceAction],
+        },
+        {
+          stageName: 'Build',
+          actions: [buildAction],
+        },
+      ],
+    });
 
     new cdk.CfnOutput(this, 'SourceS3Path', {
       value: `s3://${bucket.bucketName}/${sourceS3Path}`,
