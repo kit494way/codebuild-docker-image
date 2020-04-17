@@ -20,7 +20,8 @@ export class CodebuildDockerImageStack extends cdk.Stack {
       cdk.Fn.importValue(`${props.s3StackName}-SourceS3BucketName`)
     );
 
-    const repository = new ecr.Repository(this, 'ECRRepository', {
+    const ecrStack = new cdk.Stack(this, 'ECRStack');
+    const repository = new ecr.Repository(ecrStack, 'ECRRepository', {
       repositoryName: props.ecrName,
     });
 
