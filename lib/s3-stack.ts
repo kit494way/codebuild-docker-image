@@ -11,11 +11,5 @@ export class S3Stack extends cdk.Stack {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       versioned: true,
     });
-
-    new cdk.CfnOutput(this, 'SourceS3BucketName', {
-      value: this.bucket.bucketName,
-      description: 'Source S3 bucket.',
-      exportName: `${this.stackName}-SourceS3BucketName`,
-    });
   }
 }
