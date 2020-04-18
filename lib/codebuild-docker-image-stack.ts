@@ -2,11 +2,14 @@ import * as cdk from '@aws-cdk/core';
 import * as codebuild from '@aws-cdk/aws-codebuild';
 import * as codepipeline from '@aws-cdk/aws-codepipeline';
 import * as codepipeline_actions from '@aws-cdk/aws-codepipeline-actions';
+import { CfnNotificationRule } from '@aws-cdk/aws-codestarnotifications';
 import * as ecr from '@aws-cdk/aws-ecr';
 import * as s3 from '@aws-cdk/aws-s3';
+import * as sns from '@aws-cdk/aws-sns';
 
 export interface CodebuildDockerImageStackProps extends cdk.StackProps {
   s3StackName: string;
+  snsTopic: sns.ITopic;
   ecrName: string;
 }
 
@@ -93,7 +96,7 @@ export class CodebuildDockerImageStack extends cdk.Stack {
       input: sourceOutput,
     });
 
-    new codepipeline.Pipeline(this, 'Pipeline', {
+    const pipeline = new codepipeline.Pipeline(this, 'Pipeline', {
       stages: [
         {
           stageName: 'Source',
@@ -102,6 +105,40 @@ export class CodebuildDockerImageStack extends cdk.Stack {
         {
           stageName: 'Build',
           actions: [buildAction],
+        },
+      ],
+    });
+
+    props.snsTopic.grantPublish(pipeline.role);
+
+    new CfnNotificationRule(this, 'CodePipelineNotification', {
+      detailType: 'FULL',
+      name: `${projectName}-notification`,
+      resource: pipeline.pipelineArn,
+      eventTypeIds: [
+        'codepipeline-pipeline-action-execution-succeeded',
+        'codepipeline-pipeline-action-execution-failed',
+        'codepipeline-pipeline-stage-execution-started',
+        'codepipeline-pipeline-pipeline-execution-failed',
+        'codepipeline-pipeline-manual-approval-failed',
+        'codepipeline-pipeline-pipeline-execution-canceled',
+        'codepipeline-pipeline-action-execution-canceled',
+        'codepipeline-pipeline-pipeline-execution-started',
+        'codepipeline-pipeline-stage-execution-succeeded',
+        'codepipeline-pipeline-manual-approval-needed',
+        'codepipeline-pipeline-stage-execution-resumed',
+        'codepipeline-pipeline-pipeline-execution-resumed',
+        'codepipeline-pipeline-stage-execution-canceled',
+        'codepipeline-pipeline-action-execution-started',
+        'codepipeline-pipeline-manual-approval-succeeded',
+        'codepipeline-pipeline-pipeline-execution-succeeded',
+        'codepipeline-pipeline-stage-execution-failed',
+        'codepipeline-pipeline-pipeline-execution-superseded',
+      ],
+      targets: [
+        {
+          targetType: 'SNS',
+          targetAddress: props.snsTopic.topicArn,
         },
       ],
     });
