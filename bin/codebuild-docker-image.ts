@@ -16,13 +16,12 @@ fs.readdirSync('./dockerfiles', { withFileTypes: true }).forEach((dirent) => {
   if (!dirent.isDirectory()) {
     return;
   }
-  const stack = new CodebuildDockerImageStack(app, `CodebuildDockerImageStack-${dirent.name}`, {
-    s3StackName: s3Stack.stackName,
+
+  new CodebuildDockerImageStack(app, `CodebuildDockerImageStack-${dirent.name}`, {
+    s3Bucket: s3Stack.bucket,
     snsTopic: snsStack.topic,
     ecrName: dirent.name,
   });
-
-  stack.addDependency(s3Stack);
 });
 
 app.synth();

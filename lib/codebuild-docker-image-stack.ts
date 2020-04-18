@@ -8,7 +8,7 @@ import * as s3 from '@aws-cdk/aws-s3';
 import * as sns from '@aws-cdk/aws-sns';
 
 export interface CodebuildDockerImageStackProps extends cdk.StackProps {
-  s3StackName: string;
+  s3Bucket: s3.IBucket;
   snsTopic: sns.ITopic;
   ecrName: string;
 }
@@ -17,11 +17,7 @@ export class CodebuildDockerImageStack extends cdk.Stack {
   constructor(scope: cdk.Construct, id: string, props: CodebuildDockerImageStackProps) {
     super(scope, id, props);
 
-    const bucket = s3.Bucket.fromBucketName(
-      this,
-      'SourceS3Bucket',
-      cdk.Fn.importValue(`${props.s3StackName}-SourceS3BucketName`)
-    );
+    const { s3Bucket, snsTopic } = props;
 
     const ecrStack = new cdk.Stack(this, 'ECRStack');
     const repository = new ecr.Repository(ecrStack, 'ECRRepository', {
@@ -34,7 +30,7 @@ export class CodebuildDockerImageStack extends cdk.Stack {
     const project = new codebuild.Project(this, 'CodeBuildProject', {
       projectName,
       badge: false, // Not supported for source type S3.
-      source: codebuild.Source.s3({ bucket, path: sourceS3Path }),
+      source: codebuild.Source.s3({ bucket: s3Bucket, path: sourceS3Path }),
       cache: codebuild.Cache.local(
         codebuild.LocalCacheMode.DOCKER_LAYER,
         codebuild.LocalCacheMode.CUSTOM
@@ -85,7 +81,7 @@ export class CodebuildDockerImageStack extends cdk.Stack {
     const sourceOutput = new codepipeline.Artifact();
     const sourceAction = new codepipeline_actions.S3SourceAction({
       actionName: 'S3Source',
-      bucket,
+      bucket: s3Bucket,
       bucketKey: sourceS3Path,
       output: sourceOutput,
     });
@@ -109,7 +105,7 @@ export class CodebuildDockerImageStack extends cdk.Stack {
       ],
     });
 
-    props.snsTopic.grantPublish(pipeline.role);
+    snsTopic.grantPublish(pipeline.role);
 
     new CfnNotificationRule(this, 'CodePipelineNotification', {
       detailType: 'FULL',
@@ -138,13 +134,13 @@ export class CodebuildDockerImageStack extends cdk.Stack {
       targets: [
         {
           targetType: 'SNS',
-          targetAddress: props.snsTopic.topicArn,
+          targetAddress: snsTopic.topicArn,
         },
       ],
     });
 
     new cdk.CfnOutput(this, 'SourceS3Path', {
-      value: `s3://${bucket.bucketName}/${sourceS3Path}`,
+      value: `s3://${s3Bucket.bucketName}/${sourceS3Path}`,
       description: `Source S3 url of codebuild project ${projectName}.`,
     });
   }
