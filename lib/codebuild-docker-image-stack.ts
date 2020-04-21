@@ -38,6 +38,7 @@ export class CodebuildDockerImageStack extends cdk.Stack {
       environment: {
         buildImage: codebuild.LinuxBuildImage.STANDARD_4_0,
         environmentVariables: {
+          DOCKER_BUILDKIT: { value: '1' },
           AWS_ACCOUNT_ID: { value: this.account },
           IMAGE_REPO_NAME: { value: props.ecrName },
         },
